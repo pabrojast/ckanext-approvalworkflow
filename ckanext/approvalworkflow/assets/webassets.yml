@@ -1,0 +1,14 @@
+# approvalworkflow-js:
+#   filter: rjsmin
+#   output: ckanext-approvalworkflow/%(version)s-approvalworkflow.js
+#   contents:
+#     - js/approvalworkflow.js
+#   extra:
+#     preload:
+#       - base/main
+
+# approvalworkflow-css:
+#   filter: cssrewrite
+#   output: ckanext-approvalworkflow/%(version)s-approvalworkflow.css
+#   contents:
+#     - css/approvalworkflow.css
