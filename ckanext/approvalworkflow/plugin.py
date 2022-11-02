@@ -2,6 +2,7 @@ import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
 
 from ckanext.approvalworkflow.blueprint import blueprint as approval_package_blueprint
+from ckanext.approvalworkflow.blueprint import approval_workflow as approval_workflow_blueprint
 
 
 class ApprovalworkflowPlugin(plugins.SingletonPlugin):
@@ -9,7 +10,7 @@ class ApprovalworkflowPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IBlueprint)
 
     def get_blueprint(self):
-        return [approval_package_blueprint]
+        return [approval_package_blueprint, approval_workflow_blueprint]
 
     # IConfigurer
 
