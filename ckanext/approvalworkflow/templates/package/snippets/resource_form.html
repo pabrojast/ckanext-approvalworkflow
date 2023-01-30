@@ -43,6 +43,9 @@
         </span>
       {% endcall %}
     {% endblock %}
+    
+    <input type="hidden" id="state" name="state" value="pending">
+
   {% endblock basic_fields %}
 
   {% block metadata_fields %}
@@ -61,6 +64,7 @@
   {% endblock %}
 
   <div class="form-actions">
+    {% set aw_pkg = h.get_approvalworkflow_info({}, pkg_name) %}
     {% block delete_button %}
       {% if data.id %}
         {% if h.check_access('resource_delete', {'id': data.id})  %}
@@ -77,11 +81,11 @@
       <button class="btn btn-default" name="save" value="again" type="submit">{{ _('Save & add another') }}</button>
     {% endblock %}
     {% if stage %}
-      {% block review_button %}
-        <button class="btn btn-primary" name="save" value="review" type="submit">{% block review_button_text %}{{ _('Review') }}{% endblock %}</button>
-      {% endblock %}    
-
-    {% else %}
+      {% if aw_pkg['active'] %}
+        {% block review_button %}
+          <button class="btn btn-primary" name="save" value="review" type="submit">{% block review_button_text %}{{ _('Review') }}{% endblock %}</button>
+        {% endblock %}
+      {% endif %}
       {% block add_button %}
         <button class="btn btn-primary" name="save" value="go-dataset-complete" type="submit">{{ _('Add') }}</button>
       {% endblock %}

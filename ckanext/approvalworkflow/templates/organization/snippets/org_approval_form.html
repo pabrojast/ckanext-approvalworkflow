@@ -1,0 +1,29 @@
+{% extends "organization/read_base.html" %}
+
+{% block scripts %}
+    {{ super() }}
+    {% asset 'approvalworkflow/approvalworkflow-org-js' %}
+{% endblock %}
+
+{% import 'macros/autoform.html' as autoform %}
+
+{% import 'macros/form.html' as form %}
+
+{% block primary_content_inner %}
+
+  {{ form.errors(error_summary) }}
+
+  <form method='post' action="" id="approval-config-form" enctype="multipart/form-data">
+    {% block approval_form %}
+        {{ form.select('approval_workflow_active', id='field-org-approval-workflow-active', label=_('Activate approval workflow'), options=data['org_activity_workflow_options'], selected=data_dict.org_approval_workflow_active, error=error) }}
+        <div id="edit-options">
+        {{ form.checkbox('ckan.edit-button', label="Disable edit button" ,value=True, checked=data_dict.deactivate_edit, error=error) }}
+        </div>
+
+      {% endblock %}
+      <div class="form-actions">
+        <!-- <a href="{% url_for 'admin.reset_config' %}" class="btn btn-danger pull-left" data-module="confirm-action" data-module-content="{{ _('Are you sure you want to reset the config?') }}">{{ _('Reset') }}</a> -->
+        <button type="submit" class="btn btn-primary" name="save">{{ _('Update Config') }}</button>
+      </div>
+  </form>
+{% endblock %}

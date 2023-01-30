@@ -24,6 +24,8 @@ import ckan.model as model
 import ckan.plugins as plugins
 from ckan.common import _, g, request
 from ckan.views.home import CACHE_PARAMETERS
+from ckan.lib.search import SearchError, SearchQueryError, SearchIndexError
+
 from ckan.views.dataset import (
     _get_pkg_template, _get_package_type, _setup_template_variables
 )
@@ -44,10 +46,7 @@ from ckan.views.user import _extra_template_variables
 
 
 
-approval_workflow = Blueprint('approval_workflow', __name__)
-
-
-def index():
+def approval_workflow_settings():
     context = {
         u'model': model,
         u'session': model.Session,
@@ -55,21 +54,9 @@ def index():
         u'auth_user_obj': g.userobj,
         u'for_view': True
     }
-    data_dict = {u'user_obj': g.userobj, u'offset': 0}
-    extra_vars = _extra_template_variables(context, data_dict)
-    print (extra_vars)
-
-    # extra_vars['] = logic.get_action(u'followee_list')(
-    #     context, {
-    #         u'id': g.userobj.id,
-    #         u'q': q
-    #     })
-    #context = {u'for_view': True, u'user': g.user, u'auth_user_obj': g.userobj}
-    data_dict = {u'include_review': True, u'include_private': True}
-    packages = package_review_search(context, data_dict)
-    print (extra_vars.get('results'))
-    r = (extra_vars.get('results'))
-    return tk.render('approval_workflow/index.html', extra_vars={'packages': packages})
+    # turn on approval workflow
+    # who can review a dataset? org admin sysadmin
+    # which organizations need approval workflow    
 
 import ckan.lib.navl.dictization_functions
 from ckan.common import config, asbool
@@ -378,156 +365,225 @@ def package_review_search(context, data_dict):
 
     return search_results
 
-approval_workflow.add_url_rule("/workflow", view_func=index)
+
+def approve_dataset_metadata(context, data_dict):
+    '''Update a dataset (package).
+
+    You must be authorized to edit the dataset and the groups that it belongs
+    to.
+
+    .. note:: Update methods may delete parameters not explicitly provided in the
+        data_dict. If you want to edit only a specific attribute use `package_patch`
+        instead.
+
+    It is recommended to call
+    :py:func:`ckan.logic.action.get.package_show`, make the desired changes to
+    the result, and then call ``package_update()`` with it.
+
+    Plugins may change the parameters of this function depending on the value
+    of the dataset's ``type`` attribute, see the
+    :py:class:`~ckan.plugins.interfaces.IDatasetForm` plugin interface.
+
+    For further parameters see
+    :py:func:`~ckan.logic.action.create.package_create`.
+
+    :param id: the name or id of the dataset to update
+    :type id: string
+
+    :returns: the updated dataset (if ``'return_package_dict'`` is ``True`` in
+              the context, which is the default. Otherwise returns just the
+              dataset id)
+    :rtype: dictionary
+
+    '''
+    model = context['model']
+    session = context['session']
+    name_or_id = data_dict.get('id') or data_dict.get('name')
+    if name_or_id is None:
+        raise ValidationError({'id': _('Missing value')})
+
+    pkg = model.Package.get(name_or_id)
+    if pkg is None:
+        raise NotFound(_('Package was not found.'))
+    context["package"] = pkg
+
+    # immutable fields
+    data_dict["id"] = pkg.id
+    data_dict['type'] = pkg.type
+
+    _check_access('package_update', context, data_dict)
+
+    user = context['user']
+    # get the schema
+    package_plugin = lib_plugins.lookup_package_plugin(pkg.type)
+    if 'schema' in context:
+        schema = context['schema']
+    else:
+        schema = package_plugin.update_package_schema()
+
+    if 'api_version' not in context:
+        # check_data_dict() is deprecated. If the package_plugin has a
+        # check_data_dict() we'll call it, if it doesn't have the method we'll
+        # do nothing.
+        check_data_dict = getattr(package_plugin, 'check_data_dict', None)
+        if check_data_dict:
+            try:
+                package_plugin.check_data_dict(data_dict, schema)
+            except TypeError:
+                # Old plugins do not support passing the schema so we need
+                # to ensure they still work.
+                package_plugin.check_data_dict(data_dict)
+
+    resource_uploads = []
+    for resource in data_dict.get('resources', []):
+        # file uploads/clearing
+        upload = uploader.get_resource_uploader(resource)
+
+        if 'mimetype' not in resource:
+            if hasattr(upload, 'mimetype'):
+                resource['mimetype'] = upload.mimetype
+
+        if 'size' not in resource and 'url_type' in resource:
+            if hasattr(upload, 'filesize'):
+                resource['size'] = upload.filesize
+
+        resource_uploads.append(upload)
+
+    data, errors = lib_plugins.plugin_validate(
+        package_plugin, context, data_dict, schema, 'package_update')
+    log.debug('package_update validate_errs=%r user=%s package=%s data=%r',
+              errors, context.get('user'),
+              context.get('package').name if context.get('package') else '',
+              data)
+
+    if errors:
+        model.Session.rollback()
+        raise ValidationError(errors)
+
+    #avoid revisioning by updating directly
+    print ('HERE')
+    model.Session.query(model.Package).filter_by(id=pkg.id).update(
+        {"metadata_modified": datetime.datetime.utcnow(), "status": "active"})
+    model.Session.refresh(pkg)
+
+    pkg = model_save.package_dict_save(data, context)
+
+    context_org_update = context.copy()
+    context_org_update['ignore_auth'] = True
+    context_org_update['defer_commit'] = True
+    _get_action('package_owner_org_update')(context_org_update,
+                                            {'id': pkg.id,
+                                             'organization_id': pkg.owner_org})
+
+    # Needed to let extensions know the new resources ids
+    model.Session.flush()
+    for index, (resource, upload) in enumerate(
+            zip(data.get('resources', []), resource_uploads)):
+        resource['id'] = pkg.resources[index].id
+
+        upload.upload(resource['id'], uploader.get_max_resource_size())
+
+    for item in plugins.PluginImplementations(plugins.IPackageController):
+        item.edit(pkg)
+
+        item.after_update(context, data)
+
+    # Create activity
+    if not pkg.private:
+        user_obj = model.User.by_name(user)
+        if user_obj:
+            user_id = user_obj.id
+        else:
+            user_id = 'not logged in'
+
+        activity = pkg.activity_stream_item('changed', user_id)
+        session.add(activity)
+
+    if not context.get('defer_commit'):
+        model.repo.commit()
+
+    log.debug('Updated object %s' % pkg.name)
+
+    return_id_only = context.get('return_id_only', False)
+
+    # Make sure that a user provided schema is not used on package_show
+    context.pop('schema', None)
+
+    # we could update the dataset so we should still be able to read it.
+    context['ignore_auth'] = True
+    output = data_dict['id'] if return_id_only \
+            else _get_action('package_show')(context, {'id': data_dict['id']})
+
+    return output
 
 
-blueprint = Blueprint(
-    u'approval_package',
-    __name__,
-    url_prefix=u'/dataset/<id>/resource',
-    url_defaults={u'package_type': u'dataset'}
-)
 
-class ApprovalCreateView(MethodView):
-
-    def post(self, package_type, id):
-        print ("YYYEYEYEYEYEYEY")
-        save_action = request.form.get(u'save')
-        data = clean_dict(
-            dict_fns.unflatten(tuplize_dict(parse_params(request.form)))
-        )
-        data.update(clean_dict(
-            dict_fns.unflatten(tuplize_dict(parse_params(request.files)))
-        ))
-
-        # we don't want to include save as it is part of the form
-        del data[u'save']
-        resource_id = data.pop(u'id')
-
+class ApprovalEditView(MethodView):
+    def _prepare(self, id, data=None):
         context = {
             u'model': model,
             u'session': model.Session,
             u'user': g.user,
-            u'auth_user_obj': g.userobj
+            u'auth_user_obj': g.userobj,
+            u'save': u'save' in request.form
         }
+        return context
 
-        # see if we have any data that we are trying to save
-        data_provided = False
-        for key, value in six.iteritems(data):
-            if (
-                    (value or isinstance(value, cgi.FieldStorage))
-                    and key != u'resource_type'):
-                data_provided = True
-                break
-
-        if not data_provided and save_action != u"go-dataset-complete":
-            if save_action == u'go-dataset':
-                # go to final stage of adddataset
-                return h.redirect_to(u'{}.edit'.format(package_type), id=id)
-            # see if we have added any resources
-            try:
-                data_dict = get_action(u'package_show')(context, {u'id': id})
-            except NotAuthorized:
-                return base.abort(403, _(u'Unauthorized to update dataset'))
-            except NotFound:
-                return base.abort(
-                    404,
-                    _(u'The dataset {id} could not be found.').format(id=id)
-                )
-            if not len(data_dict[u'resources']):
-                # no data so keep on page
-                msg = _(u'You must add at least one data resource')
-                # On new templates do not use flash message
-
-                errors = {}
-                error_summary = {_(u'Error'): msg}
-                return self.get(package_type, id, data, errors, error_summary)
-
-            # XXX race condition if another user edits/deletes
-            data_dict = get_action(u'package_show')(context, {u'id': id})
-            get_action(u'package_update')(
-                dict(context, allow_state_change=True),
-                dict(data_dict, state=u'active')
-            )
-            return h.redirect_to(u'{}.read'.format(package_type), id=id)
-
-        data[u'package_id'] = id
+    def post(self, package_type, id):
+        print ('EDIT WORKFLOW')
+        context = self._prepare(id)
+        package_type = _get_package_type(id) or package_type
+        log.debug(u'Package save request name: %s POST: %r', id, request.form)
         try:
-            if resource_id:
-                data[u'id'] = resource_id
-                get_action(u'resource_update')(context, data)
-            else:
-                get_action(u'resource_create')(context, data)
+            data_dict = clean_dict(
+                dict_fns.unflatten(tuplize_dict(parse_params(request.form)))
+            )
+        except dict_fns.DataError:
+            return base.abort(400, _(u'Integrity Error'))
+        try:
+            if u'_ckan_phase' in data_dict:
+                # we allow partial updates to not destroy existing resources
+                context[u'allow_partial_update'] = True
+                if u'tag_string' in data_dict:
+                    data_dict[u'tags'] = ckan.views.dataset._tag_string_to_list(
+                        data_dict[u'tag_string']
+                    )
+                del data_dict[u'_ckan_phase']
+                del data_dict[u'save']
+            context[u'message'] = data_dict.get(u'log_message', u'')
+            data_dict['id'] = id
+            data_dict['state'] = 'active'
+            pkg_dict = get_action(u'package_update')(context, data_dict)
+
+            return ckan.views.dataset._form_save_redirect(
+                pkg_dict[u'name'], u'edit', package_type=package_type
+            )
+        except NotAuthorized:
+            return base.abort(403, _(u'Unauthorized to read package %s') % id)
+        except NotFound as e:
+            return base.abort(404, _(u'Dataset not found'))
+        except SearchIndexError as e:
+            try:
+                exc_str = text_type(repr(e.args))
+            except Exception:  # We don't like bare excepts
+                exc_str = text_type(str(e))
+            return base.abort(
+                500,
+                _(u'Unable to update search index.') + exc_str
+            )
         except ValidationError as e:
             errors = e.error_dict
             error_summary = e.error_summary
-            if data.get(u'url_type') == u'upload' and data.get(u'url'):
-                data[u'url'] = u''
-                data[u'url_type'] = u''
-                data[u'previous_upload'] = True
-            return self.get(package_type, id, data, errors, error_summary)
-        except NotAuthorized:
-            return base.abort(403, _(u'Unauthorized to create a resource'))
-        except NotFound:
-            return base.abort(
-                404, _(u'The dataset {id} could not be found.').format(id=id)
-            )
-        if save_action == u'go-metadata':
-            # XXX race condition if another user edits/deletes
-            data_dict = get_action(u'package_show')(context, {u'id': id})
-            get_action(u'package_update')(
-                dict(context, allow_state_change=True),
-                dict(data_dict, state=u'active')
-            )
-            return h.redirect_to(u'{}.read'.format(package_type), id=id)
-        
-        elif save_action == u'review':
-            # XXX race condition if another user edits/deletes
-            data_dict = get_action(u'package_show')(context, {u'id': id})
-            get_action(u'package_update')(
-                dict(context, allow_state_change=True),
-                dict(data_dict, state=u'pending')
-            )
-            send_email(data_dict)
-            return h.redirect_to(u'{}.read'.format(package_type), id=id)            
-        elif save_action == u'go-dataset':
-            # go to first stage of add dataset
-            return h.redirect_to(u'{}.edit'.format(package_type), id=id)
-        elif save_action == u'go-dataset-complete':
+            return self.get(package_type, id, data_dict, errors, error_summary)
 
-            return h.redirect_to(u'{}.read'.format(package_type), id=id)
-        else:
-            # add more resources
-            return h.redirect_to(
-                u'{}_resource.new'.format(package_type),
-                id=id
-            )
 
-def send_email(data_dict):
-    email_success = True
 
-    mail_dict = {
-        'recipient_email': toolkit.config.get('ckanext.contact.mail_to',
-                                                toolkit.config.get('email_to')),
-        'recipient_name': toolkit.config.get('ckanext.contact.recipient_name',
-                                                toolkit.config.get('ckan.site_title')),
-        'subject': 'Review needed',
-        'body': '\n'.join(data_dict['name']),
-        'headers': {
-            'reply-to': toolkit.config.get('ckanext.contact.mail_to',
-                                                toolkit.config.get('email_to'))
-        }
-    }
-    try:
-        mailer.mail_recipient(**mail_dict)
-    except (mailer.MailerException, socket.error):
-        email_success = False
+# def register_dataset_plugin_rules(blueprint):
+#     blueprint.add_url_rule(
+#          u'/edit/<id>', view_func=ApprovalEditView.as_view(str(u'edit')))
 
-    return {
-        'success': email_success
-    }
+#register_dataset_plugin_rules(dataset_blueprint)
+#register_approval_plugin_rules(blueprint_edit)
 
-def register_dataset_plugin_rules(blueprint):
-    blueprint.add_url_rule(u'/new', view_func=ApprovalCreateView.as_view(str(u'new')))
 
-register_dataset_plugin_rules(blueprint)
+
