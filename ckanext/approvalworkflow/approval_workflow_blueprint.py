@@ -247,8 +247,6 @@ def package_review_search(context, data_dict):
         data_dict.setdefault('fq', '')
         if not include_private:
             data_dict['fq'] = '+capacity:public ' + data_dict['fq']
-        # if include_drafts:
-        #     data_dict['fq'] += ' +state:(active OR draft)'
         if include_review:
             data_dict['fq'] += ' +state:(pending)'
 
@@ -355,7 +353,7 @@ def package_review_search(context, data_dict):
         search_results['search_facets'][facet]['items'] = sorted(
             search_results['search_facets'][facet]['items'],
             key=lambda facet: facet['display_name'], reverse=True)
-    
+
     return search_results
 
 
@@ -409,7 +407,6 @@ def approval_user_show(context, data_dict):
     if not bool(user_obj):
         raise NotFound
 
-    # include private and draft datasets?
     requester = context.get('user')
     sysadmin = False
     if requester:
@@ -441,7 +438,8 @@ def approval_user_show(context, data_dict):
         include_review = sysadmin and asbool(
             data_dict.get('include_review', False))
 
-        fq = "+creator_user_id:{0}".format(user_dict['id'])
+        #fq = "+creator_user_id:{0}".format(user_dict['id'])
+        fq = ""
 
         search_dict = {'rows': 50}
 
@@ -451,6 +449,7 @@ def approval_user_show(context, data_dict):
                 'include_drafts': True})
         
         if include_review:
+            print ('In include review')
             if include_private_and_draft_datasets:
                 search_dict.update({
                     'include_private': True,
@@ -458,11 +457,11 @@ def approval_user_show(context, data_dict):
             else:
                 search_dict.update({
                     'include_private': True,
-                    'include_review': True})   
+                    'include_review': True})
 
         search_dict.update({'fq': fq})
-        datasets = package_review_search(context, search_dict)['results']
-
+        user_dict['datasets'] = package_review_search(context, search_dict)['results']
+    
     return user_dict
 
 
