@@ -12,9 +12,9 @@ The extension provides 3 options for the Approval Workflow:
 
 ## Requirements
 
-Make sure to have [email settings] (https://docs.ckan.org/en/2.9/maintaining/configuration.html#email-settings) in your `ckan.ini` file.
+Make sure to have [email settings](https://docs.ckan.org/en/2.9/maintaining/configuration.html#email-settings) in your `ckan.ini` file.
 
-The extension can work with [ckanext-datasetversions] (https://github.com/keitaroinc/ckanext-datasetversions)
+The extension can work with [ckanext-datasetversions](https://github.com/keitaroinc/ckanext-datasetversions)
 
 
 Compatibility with core CKAN versions: 2.9
@@ -29,10 +29,13 @@ To install ckanext-approvalworkflow:
 
 2. Clone the source and install it on the virtualenv
 
-    git clone https://github.com//ckanext-approvalworkflow.git
-    cd ckanext-approvalworkflow
-    pip install -e .
-	pip install -r requirements.txt
+    `git clone https://github.com//ckanext-approvalworkflow.git`
+    
+    `cd ckanext-approvalworkflow`
+    
+    `pip install -e .`
+    
+	`pip install -r requirements.txt`
 
 3. Add `approvalworkflow` to the `ckan.plugins` setting in your CKAN
    config file (by default the config file is located at
@@ -40,13 +43,13 @@ To install ckanext-approvalworkflow:
 
 4. Create the database tables running:
 
-    ckan -c /path/to/ini/file approval_workflow initdb
+    `ckan -c /path/to/ini/file approval_workflow initdb`
 
 5. If you are using ckanext-datasetversions, make sure to add `datasetversions` plugin after `approvalworkflow` in your CKAN config file
 
 6. Restart CKAN. For example if you've deployed CKAN with Apache on Ubuntu:
 
-     sudo service apache2 reload
+    `sudo service apache2 reload`
 
 
 ## Config settings
