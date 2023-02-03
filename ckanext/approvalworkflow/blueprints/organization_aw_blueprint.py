@@ -84,6 +84,10 @@ class OrganizationApprovalConfigView(MethodView):
             u'id': id
         }
 
+        user = context['user']
+        sysadmin = authz.is_sysadmin(user)
+        if not sysadmin:
+            base.abort(403, _(u'Unauthorized'))
         try:
             logic.get_action(u'organization_show')(context, data_dict)
             logic.check_access(u'organization_update', context, {u'id': id})
@@ -105,19 +109,25 @@ class OrganizationApprovalConfigView(MethodView):
         g.group_type = group_type
 
         db_model = db.ApprovalWorkflowOrganization.get(organization_id=group_dict['id'])
-        
-        if db_model:
-            model_dict = db.table_dictize(db_model, context)
+        aw_model = db.ApprovalWorkflow.get()
 
-            extra_vars = {u"group_dict": group_dict,
-                        u"group_type": group_type,
-                        u'data_dict': model_dict,
-                        u'data': items}
+        extra_vars = {u"group_dict": group_dict,
+                    u"group_type": group_type,
+                    u'data_dict': data_dict,
+                    u'data': items}
+
+        if not aw_model.active:
+            return tk.render(u'organization/snippets/approval_not_active.html', extra_vars=extra_vars)
+        elif aw_model.approval_workflow_active != '3':
+            return tk.render(u'organization/snippets/approval_not_active.html', extra_vars=extra_vars)
         else:
-            extra_vars = {u"group_dict": group_dict,
-                        u"group_type": group_type,
-                        u'data_dict': data_dict,
-                        u'data': items}            
+            if db_model:
+                model_dict = db.table_dictize(db_model, context)
+
+                extra_vars = {u"group_dict": group_dict,
+                            u"group_type": group_type,
+                            u'data_dict': model_dict,
+                            u'data': items}         
 
         return tk.render(u'organization/snippets/org_approval_form.html', extra_vars=extra_vars)
 
@@ -173,6 +183,7 @@ class OrganizationApprovalConfigView(MethodView):
                     **items)
         return tk.render(u'organization/snippets/org_approval_form.html', extra_vars=vars)
 
+
 def _get_group_dict(id, group_type):
     u''' returns the result of group_show action or aborts if there is a
     problem '''
@@ -207,5 +218,5 @@ def index(data=None, id=None):
 
     if tk.request.method == 'POST' and not data:
         return 
-        
+
     return tk.render(u'organization/snippets/org_approval_form.html', extra_vars=extra_vars)

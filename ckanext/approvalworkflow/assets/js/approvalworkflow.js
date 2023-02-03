@@ -18,7 +18,6 @@ $("#field-approval-workflow-active").change(function() {
 
   $(document).ready(function () {  
     var style = $("#field-approval-workflow-active").val();
-    console.log(style);
     if (style == "1") {
       $('#edit-options').hide();
       $('#organizations').hide();

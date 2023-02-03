@@ -13,7 +13,12 @@
             {{ _('Update Dataset') }}
         {% endif %}
         {% if data.state == 'pending' %}
+          {% set aw = h.get_approvalworkflow_info({}) %}
+          {% if not c.userobj.sysadmin %}
+            {{ _('Approval pending') }}
+          {% else %}
             {{ _('Approve') }}
+          {% endif %}
         {% endif %}
     {% endif %}
 {% endblock %}
@@ -26,6 +31,7 @@
 
 {% block delete_button %}
   {% if form_style == 'edit' and data.state == 'pending' %}
-    <a class="btn btn-danger pull-left" href="" data-module="confirm-action" data-module-content="{{ _('Are you sure you want to reject this dataset?') }}">{% block delete_button_text %}{{ _('Reject') }}{% endblock %}</a>
+    {% set aw = h.get_approvalworkflow_info({}) %}
+      <a class="btn btn-danger pull-left" href="" data-module="confirm-action" data-module-content="{{ _('Are you sure you want to reject this dataset?') }}">{% block delete_button_text %}{{ _('Reject') }}{% endblock %}</a>
   {% endif %}  
 {% endblock %}

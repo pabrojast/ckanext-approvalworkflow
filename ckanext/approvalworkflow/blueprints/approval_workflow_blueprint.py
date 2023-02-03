@@ -41,6 +41,7 @@ import ckan.authz as authz
 import ckan.lib.search as search
 
 from ckanext.approvalworkflow import actions
+import ckanext.approvalworkflow.helpers as aw_helpers
 import ckanext.approvalworkflow.db as db
 from ckanext.approvalworkflow.db import ApprovalWorkflow
 
@@ -86,10 +87,12 @@ class ApprovalConfigView(MethodView):
             u'user': g.user,
             u'auth_user_obj': g.userobj,
         }
-        try:
-            toolkit.check_access(u'workflow', context)
-        except NotAuthorized:
-            toolkit.abort(401, toolkit._('Not authorized to see this page'))
+
+        user = context['user']
+        sysadmin = authz.is_sysadmin(user)
+
+        if not sysadmin:
+            base.abort(403, _(u'Unauthorized'))
         return context
 
     def get(self):
@@ -122,7 +125,6 @@ class ApprovalConfigView(MethodView):
 
             del data_dict['save']
             data = actions.save_workflow_options(self, context, data_dict)
-
 
         except logic.ValidationError as e:
             items = _get_config_options()
@@ -172,19 +174,30 @@ def datasets():
     }
     
     data = _get_config_options()
-    
     data_dict_user = {u'user_obj': g.userobj, u'include_datasets': True, u'include_private': True, u'include_review': True}
-    extra_vars = approval_extra_template_variables(context, data_dict_user)
 
-    data_dict = {u'include_review': True, u'include_private': True, u'include_drafts': False}
+    approval_workflow = ApprovalWorkflow.get()
 
-    vars = dict(context=context,
-                user_dict = extra_vars['user_dict'],
-                is_sysadmin = extra_vars['is_sysadmin'],
-                data=data,
-                data_dict=data_dict)
+    if approval_workflow:
+        approval_workflow = db.table_dictize(approval_workflow, context)
 
-    return tk.render(u'approval_workflow/dashboard.html', extra_vars=vars)
+        if approval_workflow['active']:
+            extra_vars = approval_extra_template_variables(context, data_dict_user)
+
+            data_dict = {u'include_review': True, u'include_private': True, u'include_drafts': False}
+
+            vars = dict(context=context,
+                        user_dict = extra_vars['user_dict'],
+                        is_sysadmin = extra_vars['is_sysadmin'],
+                        data=data,
+                        data_dict=data_dict)
+
+            return tk.render(u'approval_workflow/dashboard.html', extra_vars=vars)
+        else:
+            data_dict = {u'user_obj': g.userobj}
+            extra_vars = _extra_template_variables(context, data_dict)
+            extra_vars['data'] = data
+            return tk.render(u'approval_workflow/snippets/not_active.html', extra_vars=extra_vars)
 
 
 def package_review_search(context, data_dict):

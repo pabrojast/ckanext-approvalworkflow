@@ -139,14 +139,13 @@ class ApprovalEditView(MethodView):
             )
             context[u'for_edit'] = True
             old_data = get_action(u'package_show')(context, {u'id': id})
-            # old data is from the database and data is passed from the
-            # user if there is a validation error. Use users data if there.
+
             if data:
                 old_data.update(data)
             data = old_data
         except (NotFound, NotAuthorized):
             return base.abort(404, _(u'Dataset not found'))
-        # are we doing a multiphase add?
+
         if data.get(u'state', u'').startswith(u'draft'):
             g.form_action = h.url_for(u'{}.new'.format(package_type))
             g.form_style = u'new'
@@ -168,7 +167,7 @@ class ApprovalEditView(MethodView):
                 403,
                 _(u'User %r not authorized to edit %s') % (g.user, id)
             )
-        # convert tags if not supplied in data
+
         if data and not data.get(u'tag_string'):
             data[u'tag_string'] = u', '.join(
                 h.dict_list_reduce(pkg_dict.get(u'tags', {}), u'name')
@@ -187,7 +186,6 @@ class ApprovalEditView(MethodView):
         }
         errors_json = h.json.dumps(errors)
 
-        # TODO: remove
         g.pkg = pkg
         g.resources_json = resources_json
         g.errors_json = errors_json
@@ -196,7 +194,6 @@ class ApprovalEditView(MethodView):
             context, {u'id': id}, package_type=package_type
         )
 
-        # we have already completed stage 1
         form_vars[u'stage'] = [u'active']
         if data.get(u'state', u'').startswith(u'draft'):
             form_vars[u'stage'] = [u'active', u'complete']

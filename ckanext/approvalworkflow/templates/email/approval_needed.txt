@@ -1,0 +1,13 @@
+Dear {{ user_name }},
+
+A new datasets has been added to the {{group_title}} and waiting for your review.
+
+Visit the following link to see the details {{dataset_link}}
+
+To view all pending datasets, visit this link: {{aw_link_datasets}}
+
+
+Have a nice day.
+
+--
+Message sent by {{ site_title }} ({{ site_url }})

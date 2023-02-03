@@ -1,7 +1,10 @@
 {% extends "approval_workflow/index.html" %}
 
-{% asset 'approvalworkflow/approvalworkflow-js' %}
-{% asset 'approvalworkflow/approvalworkflow-org-js' %}
+{% block scripts %}
+    {{ super() }}
+    {% asset 'approvalworkflow/approvalworkflow-js' %}
+{% endblock %}
+
 {% import 'macros/autoform.html' as autoform %}
 
 {% import 'macros/form.html' as form %}

@@ -19,6 +19,12 @@ def workflow(self, context):
 
 def save_workflow_options(self, context, data_dict):
     session = context.get('session')
+    userobj = context.get("auth_user_obj", None)
+    model = context.get("model")
+
+    if not userobj:
+        raise NotFound(toolkit._('User not found'))
+
     db_model = db.ApprovalWorkflow().get()
 
     aw_active = data_dict.get("approval_workflow_active")
@@ -32,6 +38,21 @@ def save_workflow_options(self, context, data_dict):
             db_model.active_per_organization = True
         else:
             db_model.active_per_organization = False
+    else:
+        db_model.active = False
+        db_model.approval_workflow_active = aw_active
+        db_model.active_per_organization = False
+        db_model.deactivate_edit = False
+
+        # find Organizations
+        aw_org_model = db.ApprovalWorkflowOrganization.approval_workflow_organization(approvalworkflow_id=db_model.id)
+
+        if aw_org_model:
+            for org in aw_org_model:
+                org.active = False
+                org.deactivate_edit = False
+                org.org_approval_workflow_active = aw_active
+                org.save()
 
     db_model.save()
     return
@@ -39,7 +60,11 @@ def save_workflow_options(self, context, data_dict):
 
 def save_org_workflow_options(self, context, data_dict):
     session = context.get('session')
+    userobj = context.get("auth_user_obj", None)
     organization = data_dict['organization']
+
+    if not userobj:
+        raise NotFound(toolkit._('User not found'))
 
     approval_workflow = db.ApprovalWorkflow().get()
 
@@ -47,6 +72,7 @@ def save_org_workflow_options(self, context, data_dict):
         aw_dict = db.table_dictize(approval_workflow, context)
 
         db_model = db.ApprovalWorkflowOrganization.get(organization_id=organization)
+
         if not db_model:
             db_model = db.ApprovalWorkflowOrganization()
 

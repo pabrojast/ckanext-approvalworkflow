@@ -93,10 +93,6 @@ class ApprovalWorkflowOrganization(DomainObject):
         '''Finds a single entity in the register.'''
         query = model.Session.query(cls).autoflush(False)
         query = query.filter_by(**kw)
-        if approval_workflow_organization:
-            query = query.order_by(sa.cast(cls.approval_workflow_organization, sa.Integer)).filter(cls.approval_workflow_organization != '')
-        else:
-            query = query.order_by(cls.created.desc())
         return query.all()
 
 from ckan.model.meta import metadata, mapper, Session

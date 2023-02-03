@@ -40,7 +40,6 @@ approval_resource_blueprint = Blueprint(
 class ApprovalCreateView(MethodView):
 
     def post(self, package_type, id):
-        print ('ApprovalCreateView')
         save_action = request.form.get(u'save')
         data = clean_dict(
             dict_fns.unflatten(tuplize_dict(parse_params(request.form)))
@@ -48,9 +47,6 @@ class ApprovalCreateView(MethodView):
         data.update(clean_dict(
             dict_fns.unflatten(tuplize_dict(parse_params(request.files)))
         ))
-        print ('SAVE ACTION')
-        print (save_action)
-        # we don't want to include save as it is part of the form
         del data[u'save']
         resource_id = data.pop(u'id')
 
@@ -85,15 +81,11 @@ class ApprovalCreateView(MethodView):
                     _(u'The dataset {id} could not be found.').format(id=id)
                 )
             if not len(data_dict[u'resources']):
-                # no data so keep on page
                 msg = _(u'You must add at least one data resource')
-                # On new templates do not use flash message
-
                 errors = {}
                 error_summary = {_(u'Error'): msg}
                 return self.get(package_type, id, data, errors, error_summary)
 
-            # XXX race condition if another user edits/deletes
             data_dict = get_action(u'package_show')(context, {u'id': id})
             get_action(u'package_update')(
                 dict(context, allow_state_change=True),
@@ -139,11 +131,19 @@ class ApprovalCreateView(MethodView):
                 dict(context, allow_state_change=True),
                 dict(data_dict, state=u'pending')
             )
-            send_email(data_dict)
-            return h.redirect_to(u'{}.read'.format(package_type), id=id)            
+            import ckanext.approvalworkflow.email as email
+            user = get_sysadmins()
+
+            org = get_action(u'organization_show')(context, {u'id': data_dict['owner_org']})
+            for user in user:
+                if user.email:
+                    email.send_approval_needed(user, org, data_dict)
+            return h.redirect_to(u'{}.read'.format(package_type), id=id)
+
         elif save_action == u'go-dataset':
             # go to first stage of add dataset
             return h.redirect_to(u'{}.edit'.format(package_type), id=id)
+
         elif save_action == u'go-dataset-complete':
             data_dict = get_action(u'package_show')(context, {u'id': id})
             get_action(u'package_update')(
@@ -157,6 +157,7 @@ class ApprovalCreateView(MethodView):
                 u'{}_resource.new'.format(package_type),
                 id=id
             )
+
     def get(
         self, package_type, id, data=None, errors=None, error_summary=None
     ):
@@ -204,29 +205,11 @@ class ApprovalCreateView(MethodView):
             template = u'package/new_resource.html'
         return base.render(template, extra_vars)
 
-def send_email(data_dict):
-    email_success = True
 
-    mail_dict = {
-        'recipient_email': toolkit.config.get('ckanext.contact.mail_to',
-                                                toolkit.config.get('email_to')),
-        'recipient_name': toolkit.config.get('ckanext.contact.recipient_name',
-                                                toolkit.config.get('ckan.site_title')),
-        'subject': 'Review needed',
-        'body': '\n'.join(data_dict['name']),
-        'headers': {
-            'reply-to': toolkit.config.get('ckanext.contact.mail_to',
-                                                toolkit.config.get('email_to'))
-        }
-    }
-    try:
-        mailer.mail_recipient(**mail_dict)
-    except (mailer.MailerException, socket.error):
-        email_success = False
-
-    return {
-        'success': email_success
-    }
+def get_sysadmins():
+    q = model.Session.query(model.User).filter(model.User.sysadmin == True,
+                                               model.User.state == 'active')
+    return q.all()
 
 def register_dataset_plugin_rules(blueprint):
     blueprint.add_url_rule(u'/new', view_func=ApprovalCreateView.as_view(str(u'new')))
