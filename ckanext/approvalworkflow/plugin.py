@@ -38,6 +38,7 @@ class ApprovalworkflowPlugin(plugins.SingletonPlugin, toolkit.DefaultDatasetForm
         # Add our custom_resource_text metadata field to the schema
         schema['private'] = [toolkit.get_validator('ignore_missing'), toolkit.get_validator('boolean_validator'),
                     toolkit.get_validator('datasets_with_no_organization_cannot_be_private')]
+        schema['approval_workflow'] = [toolkit.get_validator('ignore_missing')]
         schema['resources'].update({
                 'state' : [ toolkit.get_validator('ignore_missing'),
                 validate_state, ]
@@ -48,6 +49,7 @@ class ApprovalworkflowPlugin(plugins.SingletonPlugin, toolkit.DefaultDatasetForm
         schema = super(ApprovalworkflowPlugin, self).show_package_schema()
         schema['private'] = [toolkit.get_validator('ignore_missing'), toolkit.get_validator('boolean_validator'),
                     toolkit.get_validator('datasets_with_no_organization_cannot_be_private')]     
+        schema['approval_workflow'] = [toolkit.get_validator('ignore_missing')]
         schema['resources'].update({
                 'state' : [ toolkit.get_validator('ignore_missing'),
                 validate_state, ]
@@ -58,6 +60,7 @@ class ApprovalworkflowPlugin(plugins.SingletonPlugin, toolkit.DefaultDatasetForm
         schema = super(ApprovalworkflowPlugin, self).show_package_schema()
         schema['private'] = [toolkit.get_validator('ignore_missing'), toolkit.get_validator('boolean_validator'),
                     toolkit.get_validator('datasets_with_no_organization_cannot_be_private')]      
+        schema['approval_workflow'] = [toolkit.get_validator('ignore_missing')]
         schema['resources'].update({
                 'state' : [ toolkit.get_validator('ignore_missing'),
                 validate_state, ]

@@ -1,3 +1,7 @@
+import ckanext.approvalworkflow.db as db
+
 def initdb():
-    import ckanext.approvalworkflow.db as db
     db.init_db()
+
+def dropdb():
+    db.drop_db()

@@ -23,3 +23,10 @@ def initdb():
     """
     utils.initdb()
     click.secho(u"Approval Workflow DB tables created", fg=u"green")
+
+
+@approval_workflow.command()
+def dropdb():
+    utils.dropdb()
+    click.secho(u"Approval Workflow DB tables deleted", fg=u"green")
+

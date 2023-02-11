@@ -153,3 +153,11 @@ def init_db():
 
     if not approval_workflow_organization_table.exists():
         approval_workflow_organization_table.create()
+
+
+def drop_db():
+    if approval_workflow_organization_table.exists():
+        approval_workflow_organization_table.drop()
+
+    if approval_workflow_table.exists():
+        approval_workflow_table.drop()
