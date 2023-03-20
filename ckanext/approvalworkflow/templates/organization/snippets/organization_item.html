@@ -1,0 +1,15 @@
+{% ckan_extends %}
+
+{% set url = h.url_for(organization.type ~ '.read', id=organization.name) %}
+{% block item %}
+<li class="media-item">
+    {% block item_inner %}
+
+    {{ super() }}
+    {% set org_active = h.get_approval_org_info({}, organization.id) %}
+    {% if org_active %}
+        <span class="fa fa-line-chart"></span>
+    {% endif %}
+    {% endblock %}
+</li>
+{% endblock %}
