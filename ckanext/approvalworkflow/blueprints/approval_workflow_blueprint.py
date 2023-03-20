@@ -107,7 +107,9 @@ class ApprovalConfigView(MethodView):
         if approval_workflow:
             approval_workflow = db.table_dictize(approval_workflow, context)
 
-        extra_vars['data'] = dict(items, **approval_workflow)
+            extra_vars['data'] = dict(items, **approval_workflow)
+        else:
+            extra_vars['data'] = dict(items)
 
         return tk.render(u'approval_workflow/snippets/approval_form.html', extra_vars=extra_vars)
 
