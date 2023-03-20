@@ -27,6 +27,9 @@ def save_workflow_options(self, context, data_dict):
 
     db_model = db.ApprovalWorkflow().get()
 
+    if not db_model:
+        db_model = db.ApprovalWorkflow()
+    
     aw_active = data_dict.get("approval_workflow_active")
 
     if aw_active != '1':

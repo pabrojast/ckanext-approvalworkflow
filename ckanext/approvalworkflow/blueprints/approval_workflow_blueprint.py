@@ -185,8 +185,9 @@ def datasets():
 
         if approval_workflow['active']:
             extra_vars = approval_extra_template_variables(context, data_dict_user)
+            print (extra_vars)
 
-            data_dict = {u'include_review': True, u'include_private': True, u'include_drafts': False}
+            data_dict = extra_vars['user_dict']
 
             vars = dict(context=context,
                         user_dict = extra_vars['user_dict'],
@@ -195,11 +196,11 @@ def datasets():
                         data_dict=data_dict)
 
             return tk.render(u'approval_workflow/dashboard.html', extra_vars=vars)
-        else:
-            data_dict = {u'user_obj': g.userobj}
-            extra_vars = _extra_template_variables(context, data_dict)
-            extra_vars['data'] = data
-            return tk.render(u'approval_workflow/snippets/not_active.html', extra_vars=extra_vars)
+    else:
+        data_dict = {u'user_obj': g.userobj}
+        extra_vars = _extra_template_variables(context, data_dict)
+        extra_vars['data'] = data
+        return tk.render(u'approval_workflow/snippets/not_active.html', extra_vars=extra_vars)
 
 
 def package_review_search(context, data_dict):
@@ -254,7 +255,6 @@ def package_review_search(context, data_dict):
         else:
             data_dict['fl'] = ' '.join(result_fl)
 
-        # Remove before these hit solr FIXME: whitelist instead
         include_private = asbool(data_dict.pop('include_private', False))
         include_drafts = asbool(data_dict.pop('include_drafts', False))
         include_review = asbool(data_dict.pop('include_review', False))
@@ -263,7 +263,7 @@ def package_review_search(context, data_dict):
         if not include_private:
             data_dict['fq'] = '+capacity:public ' + data_dict['fq']
         if include_review:
-            data_dict['fq'] += ' +state:(pending)'
+            data_dict['fq'] += '+state:(pending)'
 
         # Pop these ones as Solr does not need them
         extras = data_dict.pop('extras', None)
@@ -277,6 +277,8 @@ def package_review_search(context, data_dict):
 
         query = search.query_for(model.Package)
         query.run(data_dict, permission_labels=labels)
+
+        print (query.results)
         
         # Add them back so extensions can use them on after_search
         data_dict['extras'] = extras
@@ -319,6 +321,8 @@ def package_review_search(context, data_dict):
         'results': results,
         'sort': data_dict['sort']
     }
+
+    print (search_results)
 
     # create a lookup table of group name to title for all the groups and
     # organizations in the current search's facets.
@@ -464,7 +468,6 @@ def approval_user_show(context, data_dict):
                 'include_drafts': True})
         
         if include_review:
-            print ('In include review')
             if include_private_and_draft_datasets:
                 search_dict.update({
                     'include_private': True,
@@ -475,7 +478,9 @@ def approval_user_show(context, data_dict):
                     'include_review': True})
 
         search_dict.update({'fq': fq})
+        print (search_dict)
         user_dict['datasets'] = package_review_search(context, search_dict)['results']
+        print (user_dict['datasets'])
     
     return user_dict
 

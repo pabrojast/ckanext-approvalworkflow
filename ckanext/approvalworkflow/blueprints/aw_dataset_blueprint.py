@@ -213,7 +213,62 @@ class ApprovalEditView(MethodView):
             }
         )
 
+class ApprovalWorkflowRejectView(MethodView):
+    def _prepare(self):
+        context = {
+            u'model': model,
+            u'session': model.Session,
+            u'user': g.user,
+            u'auth_user_obj': g.userobj
+        }
+        return context
+
+    def post(self, package_type, id):
+        if u'cancel' in request.form:
+            return h.redirect_to(u'{}.edit'.format(package_type), id=id)
+        context = self._prepare()
+        try:
+            pkg = get_action(u'package_show')(context, {u'id': id})
+            pkg['state'] = u'draft'
+            pkg_dict = get_action(u'package_update')(context, pkg)
+        except NotFound:
+            return base.abort(404, _(u'Dataset not found'))
+        except NotAuthorized:
+            return base.abort(
+                403,
+                _(u'Unauthorized to edit package %s') % u''
+            )
+
+        h.flash_notice(_(u'Dataset has been rejected. Saved as Draft'))
+        return h.redirect_to( u'dataset.search')
+
+    def get(self, package_type, id):
+        context = self._prepare()
+        try:
+            pkg_dict = get_action(u'package_show')(context, {u'id': id})
+        except NotFound:
+            return base.abort(404, _(u'Dataset not found'))
+        except NotAuthorized:
+            return base.abort(
+                403,
+                _(u'Unauthorized to delete package %s') % u''
+            )
+
+        dataset_type = pkg_dict[u'type'] or package_type
+
+        # TODO: remove
+        g.pkg_dict = pkg_dict
+
+        return base.render(
+            u'package/confirm_reject.html', {
+                u'pkg_dict': pkg_dict,
+                u'dataset_type': dataset_type
+            }
+        )
 
 dataset_approval_workflow.add_url_rule(
     u'/edit/<id>', view_func=ApprovalEditView.as_view(str(u'edit'))
+)
+dataset_approval_workflow.add_url_rule(
+    u'/reject/<id>', view_func=ApprovalWorkflowRejectView.as_view(str(u'reject'))
 )
