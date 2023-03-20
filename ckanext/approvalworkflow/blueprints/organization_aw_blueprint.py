@@ -116,7 +116,9 @@ class OrganizationApprovalConfigView(MethodView):
                     u'data_dict': data_dict,
                     u'data': items}
 
-        if not aw_model.active:
+        if not aw_model:
+            return tk.render(u'organization/snippets/approval_not_active.html', extra_vars=extra_vars)
+        elif aw_model.active:
             return tk.render(u'organization/snippets/approval_not_active.html', extra_vars=extra_vars)
         elif aw_model.approval_workflow_active != '3':
             return tk.render(u'organization/snippets/approval_not_active.html', extra_vars=extra_vars)
