@@ -183,9 +183,8 @@ def datasets():
     if approval_workflow:
         approval_workflow = db.table_dictize(approval_workflow, context)
 
-        if approval_workflow['active']:
+        if approval_workflow['active'] == True:
             extra_vars = approval_extra_template_variables(context, data_dict_user)
-            print (extra_vars)
 
             data_dict = extra_vars['user_dict']
 
@@ -196,6 +195,11 @@ def datasets():
                         data_dict=data_dict)
 
             return tk.render(u'approval_workflow/dashboard.html', extra_vars=vars)
+        else:
+            data_dict = {u'user_obj': g.userobj}
+            extra_vars = _extra_template_variables(context, data_dict)
+            extra_vars['data'] = data
+            return tk.render(u'approval_workflow/snippets/not_active.html', extra_vars=extra_vars)
     else:
         data_dict = {u'user_obj': g.userobj}
         extra_vars = _extra_template_variables(context, data_dict)
