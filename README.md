@@ -7,7 +7,7 @@ A CKAN extension for adding an Approval Workflow on Datasets.
 The extension provides 3 options for the Approval Workflow:
 - Not active
 - Active
-- Activate appruval workflow per organization
+- Activate approval workflow per organization
 
 
 ## Requirements
