@@ -267,7 +267,7 @@ def package_review_search(context, data_dict):
         if not include_private:
             data_dict['fq'] = '+capacity:public ' + data_dict['fq']
         if include_review:
-            data_dict['fq'] += '+state:(pending)'
+            data_dict['fq'] += ' +state:pending'
 
         # Pop these ones as Solr does not need them
         extras = data_dict.pop('extras', None)
