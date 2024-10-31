@@ -6,10 +6,14 @@
 
       {% set aw_active = h.get_approvalworkflow_info({}) %}
 
-      <!-- if state of package is pending / AW deactivated -> can't create a new version & dataset can't be edited-->
-      {% if pkg.state == 'pending' and not aw_active.active %}
+      
+      <!-- Modificamos esta condición para verificar si el workflow está activo primero -->
+      {% if pkg.state == 'pending' and aw_active.active %}
             <h4>Dataset is waiting for approval!</h4>
-      <!-- If AW active for all datasets -->
+      <!-- Si el estado es pending pero el workflow NO está activo, debería mostrar los controles normales -->
+      {% elif pkg.state == 'pending' and not aw_active.active %}
+            {{ super() }}
+      <!-- El resto de las condiciones se mantienen igual -->
       {% elif aw_active.active and aw_active.approval_workflow_active == '2' %}     
         {% if 'datasetversions' in g.plugins %}
             {{ h.snippet('package/snippets/datasetversions.html', pkg=pkg) }}
