@@ -14,7 +14,7 @@
         {% endif %}
         {% if data.state == 'pending' %}
           {% set aw = h.get_approvalworkflow_info({}) %}
-          {% if not c.userobj.sysadmin %}
+          {% if not c.userobj.sysadmin and aw.active %}
             {{ _('Approval pending') }}
           {% else %}
             {{ _('Approve') }}

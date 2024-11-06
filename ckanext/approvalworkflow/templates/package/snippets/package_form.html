@@ -13,7 +13,7 @@
         {% set aw = h.get_approvalworkflow_info({}) %}
         {% if data.id %}
             {% set aw_pkg = h.get_approvalworkflow_org_info({}, data.id) %}
-            {% if (data.state == 'pending' and aw.disable_edit) or (data.state == 'pending' and aw_pkg.deactivate_edit) %}
+            {% if (data.state == 'pending' and aw.active and aw.disable_edit) or (data.state == 'pending' and aw_pkg.active and aw_pkg.deactivate_edit) %}
                 <h4>Can't edit this dataset</h4>
             {% else %}
                 <button class="btn btn-primary" type="submit" name="save">
